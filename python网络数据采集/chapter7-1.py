@@ -13,7 +13,7 @@ def clean_input(input):
     input = re.sub('\[[0-9]*\]', "", input)
     input = re.sub(' +', " ", input)
     input = bytes(input, "UTF-8")
-    input = input.decode("ascii", "ignore")
+    input = input.decode("utf-8", "ignore")
     clean_input = []
     input = input.split(" ")
     for item in input:
