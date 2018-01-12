@@ -62,5 +62,5 @@ while len(links) > 0:
             if country is not None:
                 print(history_ip + "来自：" + country)
 
-    new_link = links[random.randint(0, len(links-1))].attrs['href']
+    new_link = links[random.randint(0, len(links)-1)].attrs['href']
     links = get_links(new_link)
