@@ -3,24 +3,36 @@
 可复用的函数集合
 参考地址：https://bitbucket.org/wswp/code/src/tip/chapter01/link_crawler3.py
 """
+import os
+# 保持打开状态
+import pickle
+# 压缩以及解压
+import zlib
 import re
 import requests
 import time
 import csv
+import hashlib
 from queue import deque
 from bs4 import BeautifulSoup
-from urllib.error import URLError
-from urllib.parse import urljoin, urlparse, urldefrag
+from urllib.parse import urljoin, urlparse, urldefrag, urlsplit
 from urllib.robotparser import RobotFileParser
-from datetime import datetime
+from datetime import datetime, timedelta
 
-user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
-             "AppleWebKit/537.36 (KHTML, like Gecko) " \
-             "Chrome/63.0.3239.132 Safari/537.36"
+# 默认用户代理
+DEFAULT_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
+                "AppleWebKit/537.36 (KHTML, like Gecko) " \
+                "Chrome/63.0.3239.132 Safari/537.36"
+# 默认等待延迟
+DEFAULT_DELAY = 5
+# 默认重连次数
+DEFAULT_RETRIES = 1
+# 默认等待超时
+DEFAULT_TIMEOUT = 60
 
 
-def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5,
-                 max_depth=-1, max_urls=-1, scrape_callback=None):
+def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
+                 max_depth=-1, max_urls=-1, scrape_callback=None, cache=None):
     """
     从给定的种子URL的正则表达式匹配的抓取链接以下链接
     seed_url 基础地址 如:https://www.baidu.com
@@ -40,14 +52,13 @@ def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5,
     # 读取robots.txt内容
     rp = get_robots(seed_url)
     # 设置等待时间
-    throttle = Throttle(delay)
-    # headers = headers or {}
+    D = DownLoader(delay=delay, user_agent=user_agent, proxies=proxies,
+                   cache=cache)
     while crawl_queue:
         url = crawl_queue.pop()
         # 检验该url在robots.txt是否禁止爬虫访问
         if rp.can_fetch(user_agent, url):
-            throttle.wait(url)
-            html = download_url(url, user_agent)
+            html = D(url)
             links = []
             if scrape_callback:
                 links.extend(scrape_callback(url, html) or [])
@@ -97,32 +108,110 @@ class Throttle:
         self.domains[domain] = datetime.now()
 
 
-def download_url(url, user_agent='wswp', num_retries=2):
+class DownLoader:
+    """下载网页源码"""
+    def __init__(self, delay=DEFAULT_DELAY, user_agent=DEFAULT_AGENT,
+                 timeout=DEFAULT_TIMEOUT, proxies=None,
+                 num_retries=DEFAULT_RETRIES, cache=None):
+        self.throttle = Throttle(delay)
+        self.user_agent = user_agent
+        self.proxies = proxies or {}
+        self.num_retries = num_retries
+        self.cache = cache
+        self.timeout = timeout
+
+    def __call__(self, url):
+        result = None
+        if self.cache:
+            try:
+                result = self.cache[url]
+            except KeyError:
+                # url 没有在缓存中
+                pass
+            else:
+                if self.num_retries > 0 and 500 <= result['code'] < 600:
+                    # 服务器错误，因此忽略缓存和重新下载的结果
+                    result = None
+        if result is None:
+            # 结果没有从缓存加载，还需下载
+            self.throttle.wait(url)
+            headers = {'User-agent': self.user_agent,
+                       "Accept": "text/html,application/xhtml+xml,"
+                                 "application/xml;q=0.9,image/webp,"
+                                 "image/apng,*/*;q=0.8"
+                       }
+            result = self.download(url, headers, num_retries=self.num_retries)
+            if self.cache:
+                # 存储结果到缓存中
+                self.cache[url] = result
+        return result['html']
+
+    def download(self, url, headers, num_retries, data=None):
+        """下载函数 返回一个字典 两个关键字分别是html 和 code"""
+        print("下载中: ", url)
+        session = requests.Session()
+        try:
+            req = session.get(url, headers=headers, proxies=self.proxies,
+                              timeout=self.timeout)
+            html = req.text
+            code = req.status_code
+        except Exception as e:
+            print("下载中出现错误", str(e))
+            html = ''
+            if hasattr(e, 'code'):
+                code = e.code
+                if num_retries > 0 and 500 <= code < 600:
+                    return self.download(url, headers, num_retries-1, data)
+            else:
+                code = None
+        return {'html': html, 'code': code}
+
+
+class DiskCache:
     """
-    下载函数 传入url 可捕获异常，重试下载并设置用户代理
-    num_retries 是重试次数 默认为2
+    磁盘缓存 可以跨平台 为每个网页保存一个缓存副本 比较占用空间
+    默认过期时间是30天
+    因为设置了__setitem__以及__getitem__所以
+    可以像调用数组那样调用 如 : disk[url]
     """
-    print("下载中：", url)
-    session = requests.Session()
-    headers = {'User-agent': user_agent,
-               "Accept": "text/html,application/xhtml+xml,application/xml;"
-                         "q=0.9,image/webp,image/apng,*/*;q=0.8"
-               }
-    # 代理
-    proxies = {
-        # "http": "http://" + ip,
-        # "https": "https://" + ip
-    }
-    try:
-        html = session.get(url, headers=headers, proxies=proxies).text
-    except URLError as e:
-        print("捕获异常：", e.reason)
-        html = None
-        if num_retries > 0:
-            if hasattr(e, 'code') and 500 <= e.code < 600:
-                # 重试 5XX Http error
-                return download_url(url, user_agent, num_retries-1)
-    return html
+    def __init__(self, cache_dir='cache', expires=timedelta(days=30)):
+        self.cache_dir = cache_dir
+        self.expires = expires
+
+    def url_to_path(self, url):
+        """把url的hash.md5值保存为文件名"""
+        my_hash = hashlib.md5(bytes('crawler', encoding='utf-8'))
+        my_hash.update(bytes(url, encoding='utf-8'))
+        filename = my_hash.hexdigest()
+        return os.path.join(self.cache_dir, filename)
+
+    def has_expired(self, timestamp):
+        """返回这个时间戳是否已经过期"""
+        return datetime.utcnow() > timestamp + self.expires
+
+    def __getitem__(self, url):
+        """为这个URL从磁盘加载数据"""
+        path = self.url_to_path(url)
+        if os.path.exists(path):
+            with open(path, 'rb') as fp:
+                result, timestamp = pickle.loads(zlib.decompress(fp.read()))
+                if self.has_expired(timestamp):
+                    raise KeyError(url + '已经过期')
+                return result
+        else:
+            # URl 不在缓存中
+            raise KeyError(url + '不存在')
+
+    def __setitem__(self, url, result):
+        """存储url数据到本地磁盘"""
+        path = self.url_to_path(url)
+        folder = os.path.dirname(path)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        timestamp = datetime.utcnow()
+        data = pickle.dumps((result, timestamp))
+        with open(path, 'wb') as fp:
+            fp.write(zlib.compress(data))
 
 
 def get_links(html):
@@ -176,6 +265,13 @@ if __name__ == "__main__":
     # url = "https://www.whatismybrowser.com/" \
     #       "developers/what-http-headers-is-my-browser-sending"
     url = 'http://example.webscraping.com'
-    link_crawler(url, '/(places/default/index|places/default/view)',
-                 user_agent=user_agent, max_depth=2, delay=1,
-                 max_urls=-1, scrape_callback=ScrapeCallback())
+    # link_crawler(url, '/(places/default/index|places/default/view)',
+    #              user_agent=DEFAULT_AGENT, max_depth=2, delay=1,
+    #              max_urls=-1, scrape_callback=ScrapeCallback())
+    D = DownLoader()
+    result = D(url)
+    cache = DiskCache(expires=timedelta(seconds=5))
+    cache[url] = result
+    print(cache[url])
+    time.sleep(5)
+    print(cache[url])
