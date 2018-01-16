@@ -43,6 +43,7 @@ def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
     max_urls 最多存储url数
     scrape_callback 回调函数 完成下载后调用
     """
+    start_time = datetime.now()
     # 仍然需要爬行的URL的队列
     crawl_queue = deque([seed_url])
     # URL深度
@@ -85,6 +86,7 @@ def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
         else:
             print("robots.txt禁止访问此url：", url)
     print("下载完成, 下载url数量:", str(num_urls))
+    print("花费时间：" + str(datetime.now() - start_time))
 
 
 class Throttle:
@@ -129,9 +131,10 @@ class DownLoader:
                 # url 没有在缓存中
                 pass
             else:
-                if self.num_retries > 0 and 500 <= result['code'] < 600:
-                    # 服务器错误，因此忽略缓存和重新下载的结果
-                    result = None
+                if result['code']:
+                    if self.num_retries > 0 and 500 <= result['code'] < 600:
+                        # 服务器错误，因此忽略缓存和重新下载的结果
+                        result = None
         if result is None:
             # 结果没有从缓存加载，还需下载
             self.throttle.wait(url)
@@ -265,13 +268,8 @@ if __name__ == "__main__":
     # url = "https://www.whatismybrowser.com/" \
     #       "developers/what-http-headers-is-my-browser-sending"
     url = 'http://example.webscraping.com'
-    # link_crawler(url, '/(places/default/index|places/default/view)',
-    #              user_agent=DEFAULT_AGENT, max_depth=2, delay=1,
-    #              max_urls=-1, scrape_callback=ScrapeCallback())
-    D = DownLoader()
-    result = D(url)
-    cache = DiskCache(expires=timedelta(seconds=5))
-    cache[url] = result
-    print(cache[url])
-    time.sleep(5)
-    print(cache[url])
+    link_crawler(url, '/(places/default/index|places/default/view)',
+                 user_agent=DEFAULT_AGENT, max_depth=2, delay=1,
+                 max_urls=-1, scrape_callback=ScrapeCallback(),
+                 cache=DiskCache())
+
