@@ -131,10 +131,10 @@ class DownLoader:
                 # url 没有在缓存中
                 pass
             else:
-                if result['code']:
-                    if self.num_retries > 0 and 500 <= result['code'] < 600:
-                        # 服务器错误，因此忽略缓存和重新下载的结果
-                        result = None
+                if self.num_retries > 0 and (result['code'] is None or 500 <= \
+                        result['code'] < 600):
+                    # 服务器错误，因此忽略缓存和重新下载的结果
+                    result = None
         if result is None:
             # 结果没有从缓存加载，还需下载
             self.throttle.wait(url)

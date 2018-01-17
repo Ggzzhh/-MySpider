@@ -54,6 +54,6 @@ if __name__ == "__main__":
     #       "developers/what-http-headers-is-my-browser-sending"
     url = 'http://example.webscraping.com'
     link_crawler(url, '/(places/default/index|places/default/view)',
-                 user_agent=5, max_depth=2, delay=1,
+                 max_depth=2, delay=1,
                  max_urls=-1,
                  cache=MongoCache())
