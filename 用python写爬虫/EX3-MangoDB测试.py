@@ -6,7 +6,7 @@ import zlib
 from bson.binary import Binary
 from datetime import datetime, timedelta
 from pymongo import MongoClient
-from 用python写爬虫.复用函数集合 import link_crawler
+from 用python写爬虫.复用函数集合 import link_crawler, MongoCache
 
 
 class MongoCache:

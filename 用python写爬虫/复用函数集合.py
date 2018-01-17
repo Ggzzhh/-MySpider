@@ -18,6 +18,8 @@ from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urldefrag, urlsplit
 from urllib.robotparser import RobotFileParser
 from datetime import datetime, timedelta
+from pymongo import MongoClient
+from bson.binary import Binary
 
 # 默认用户代理
 DEFAULT_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
@@ -31,7 +33,8 @@ DEFAULT_RETRIES = 1
 DEFAULT_TIMEOUT = 60
 
 
-def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
+def link_crawler(seed_url, link_regex=None, user_agent='wswp', delay=5,
+                 proxies=None,
                  max_depth=-1, max_urls=-1, scrape_callback=None, cache=None):
     """
     从给定的种子URL的正则表达式匹配的抓取链接以下链接
@@ -58,7 +61,7 @@ def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
     while crawl_queue:
         url = crawl_queue.pop()
         # 检验该url在robots.txt是否禁止爬虫访问
-        if rp.can_fetch(user_agent, url):
+        if rp.can_fetch(user_agent, url) or rp is None:
             html = D(url)
             links = []
             if scrape_callback:
@@ -71,15 +74,15 @@ def link_crawler(seed_url, link_regex, user_agent='wswp', delay=5, proxies=None,
                     links.extend(link for link in get_links(html) if
                                  re.match(link_regex, link))
                 for link in links:
-                    print(link)
+                    # print(link)
                     link = normalize(seed_url, link)
                     # 检查链接是否已经抓取过
                     if link not in seen:
                         seen[seed_url] = depth + 1
                         # 检查链接是否处于同一深度
-                        if same_domain(seed_url, link):
+                        # if same_domain(seed_url, link):
                             # 添加新链接在队列中
-                            crawl_queue.append(link)
+                        crawl_queue.append(link)
             num_urls += 1
             if num_urls == max_urls:
                 break
@@ -217,6 +220,46 @@ class DiskCache:
             fp.write(zlib.compress(data))
 
 
+class MongoCache:
+    def __init__(self, client=None, expires=timedelta(days=30)):
+        # 如果没有设置服务器 就尝试链接到默认端口
+        self.client = MongoClient('localhost', 27017) \
+            if client is None else client
+        # 创建一个相当于表的集合来存储缓存
+        self.db = self.client.cache
+
+    def __contains__(self, url):
+        """
+        当使用in，not in 对象的时候 调用
+        (not in 是在in完成后再取反,实际上还是in操作)
+        """
+        try:
+            self[url]
+        except KeyError:
+            return False
+        else:
+            return True
+
+    def __setitem__(self, url, result):
+        """存储url及其数据到数据库"""
+        # Binary + zlib + pickle 压缩数据
+        record = {'result': Binary(zlib.compress(pickle.dumps(result))),
+                  'timestamp': datetime.utcnow()}
+        self.db.webpage.update({'_id': url}, {'$set': record}, upsert=True)
+
+    def __getitem__(self, url):
+        """读取数据库中的url的值"""
+        record = self.db.webpage.find_one({'_id': url})
+        if record:
+            return pickle.loads(zlib.decompress(record['result']))
+        else:
+            raise KeyError(url + '不存在')
+
+    def clear(self):
+        """删除所有数据"""
+        self.db.webpage.drop()
+
+
 def get_links(html):
     """以数组的形式返回网页中的所有链接"""
     bs_obj = BeautifulSoup(html, 'lxml')
@@ -229,7 +272,10 @@ def get_links(html):
 def get_robots(seed_url):
     rp = RobotFileParser()
     rp.set_url(urljoin(seed_url, '/robots.txt'))
-    rp.read()
+    try:
+        rp.read()
+    except Exception as e:
+        return None
     return rp
 
 
