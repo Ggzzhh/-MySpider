@@ -223,7 +223,7 @@ class DiskCache:
 class MongoCache:
     def __init__(self, client=None, expires=timedelta(days=30)):
         # 如果没有设置服务器 就尝试链接到默认端口
-        self.client = MongoClient('localhost', 27017) \
+        self.client = MongoClient('localhost', 27017, maxPoolSize=200) \
             if client is None else client
         # 创建一个相当于表的集合来存储缓存
         self.db = self.client.cache

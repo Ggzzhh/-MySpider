@@ -1,13 +1,18 @@
 # -*- coding: utf-8 -*-
-"""并行爬虫 多线程爬取网站"""
+"""
+并行爬虫 多线程爬取网站
+为了支持使用数据库存储ip池 进行修改
+"""
 
 import time
 import threading
+import multiprocessing
 from urllib.parse import urldefrag, urljoin
 from datetime import datetime
 
 from 用python写爬虫.复用函数集合 import DownLoader, MongoCache
 from 用python写爬虫.EX4_解析Alexa列表 import AlexaCallback
+from 用python写爬虫.EX4_单独存储队列_MongoDB import MongoQueue
 
 SLEEP_TIME = 1
 
@@ -30,9 +35,16 @@ def threaded_crawler(seed_url, link_regex=None, user_agent='wswp', delay=5,
     max_threads  最大线程数
     """
     start_time = datetime.now()
-    crawl_queue = [seed_url]
-    seen = set([seed_url])
-
+    # 为了让进程不混乱 必须在函数内链接mongo的服务器
+    if cache is None:
+        cache = MongoCache()
+        cache.clear()
+    # 多线式原本内容
+    # crawl_queue = [seed_url]
+    # seen = set([seed_url])
+    crawl_queue = MongoQueue()
+    crawl_queue.clear()
+    crawl_queue.push(seed_url)
     D = DownLoader(cache=cache, delay=delay, user_agent=user_agent,
                    proxies=proxies, num_retries=num_retries, timeout=timeout)
 
@@ -54,9 +66,8 @@ def threaded_crawler(seed_url, link_regex=None, user_agent='wswp', delay=5,
                     else:
                         for link in links:
                             link = normalize(seed_url, link)
-                            if link not in seen:
-                                seen.add(link)
-                                crawl_queue.append(link)
+                            crawl_queue.push(link)
+                crawl_queue.complete(url)
     # 等待所有下载线程完成
     threads = []
     while threads or crawl_queue:
@@ -86,9 +97,26 @@ def normalize(seed_url, link):
     return urljoin(seed_url, link)
 
 
+def process_link_crawler(args, **kwargs):
+    """多进程爬虫"""
+    # 获取cpu数量
+    num_cpus = multiprocessing.cpu_count()
+    print("开始{}个进程".format(num_cpus))
+    processes = []
+
+    for i in range(num_cpus):
+        # 开始一个新进程，运行函数多线程爬虫函数
+        p = multiprocessing.Process(target=threaded_crawler,
+                                    args=(args,), kwargs=kwargs)
+        p.start()
+        processes.append(p)
+    # 等待进程执行完毕
+    for p in processes:
+        # join() 方法实现进程间的同步，等待所有进程退出
+        p.join()
+
+
 if __name__ == '__main__':
     scrape_callback = AlexaCallback()
-    cache = MongoCache()
-    cache.clear()
-    threaded_crawler(scrape_callback.seed_url, scrape_callback=scrape_callback,
-                     cache=cache, max_threads=5, timeout=10)
+    process_link_crawler(scrape_callback.seed_url, scrape_callback=scrape_callback,
+                     max_threads=5, timeout=10)
