@@ -13,6 +13,7 @@ import requests
 import time
 import csv
 import hashlib
+import pytesseract
 from queue import deque
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, urldefrag, urlsplit
@@ -20,6 +21,7 @@ from urllib.robotparser import RobotFileParser
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 from bson.binary import Binary
+from PIL import Image
 
 # 默认用户代理
 DEFAULT_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " \
@@ -309,6 +311,36 @@ class ScrapeCallback:
                            .find('tr', id='places_{}__row'.format(field))
                            .find('td', class_='w2p_fw').text)
             self.writer.writerow(row)
+
+
+# 进行验证码去噪以及辨认
+def image_to_str():
+    # 读取图片
+    image = Image.open('valiCode.jpg')
+    # 转换图像格式为RGBA
+    image = image.convert("RGBA")
+    # 读取图像
+    pixdata = image.load()
+    # 把红色<90的像素变为白色
+    for y in range(image.size[1]):
+        for x in range(image.size[0]):
+            if pixdata[x, y][0] < 90:
+                pixdata[x, y] = (0, 0, 0, 255)
+    # 把绿色<136的像素变为白色
+    for y in range(image.size[1]):
+        for x in range(image.size[0]):
+            if pixdata[x, y][1] < 136:
+                pixdata[x, y] = (0, 0, 0, 255)
+    # 把蓝色>0的像素变为黑色
+    for y in range(image.size[1]):
+        for x in range(image.size[0]):
+            if pixdata[x, y][2] > 0:
+                pixdata[x, y] = (255, 255, 255, 255)
+
+    image.resize((1000, 500), Image.NEAREST)
+    image.save('valiCode.gif', 'GIF')
+    return pytesseract.image_to_string(Image.open('valiCode.gif'))
+
 
 if __name__ == "__main__":
     # url = "https://www.whatismybrowser.com/" \
