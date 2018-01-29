@@ -9,7 +9,7 @@ import sys
 
 controller = Controller.from_port(port=9151)
 controller.authenticate()
-socks.set_default_proxy(socks.SOCKS5, "127.0.0.1", 9150)
+socks.set_default_proxy(socks.SOCKS5, "localhost", 9150)
 socket.socket = socks.socksocket
 
 total_scrappy_time = 0

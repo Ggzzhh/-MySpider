@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient, errors
 
 
-
 class MongoQueue:
     # 可能的下载状态
     # 当添加一个新URL时,其状态为OUTSTANDING  0
