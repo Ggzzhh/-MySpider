@@ -48,7 +48,7 @@ def get_proxy_by_181():
                 ports.append(td.text)
     L = list(map(lambda x, y: ":".join([x, y]), ips, ports))
     with open('ip.txt', 'w') as f:
-        for ip in L[:20]:
+        for ip in L:
             f.write(ip + "\n")
 
 
@@ -69,16 +69,27 @@ def get_proxies_by_cn():
 
     if trs:
         with open('ip.txt', 'a+') as f:
-            for tr in trs[:10]:
+            for tr in trs[:15]:
                 f.write(tr.contents[1].text + ":" + tr.contents[3].text + "\n")
 
 
 def get_ips():
-    get_proxy_by_181()
-    get_proxies_by_cn()
     ips = []
+    with open('ip.txt', 'r') as f:
+        if f.read() == '':
+            get_proxy_by_181()
+            # get_proxies_by_cn()
     with open('ip.txt', 'r') as f:
         for i in f:
             ips.append(i.strip())
     return ips
+
+
+def del_ip(ip):
+    with open('ip.txt', 'w+') as f:
+        for i in f:
+            if ip in i:
+                continue
+            f.write(i)
+
 
