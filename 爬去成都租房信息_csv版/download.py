@@ -92,7 +92,7 @@ class DownLoad:
 
     def __call__(self, url):
         result = None
-        print('-----------------开始下载:{url}----------------------'.format(
+        print('-----------------开始下载:{url} ----------------------'.format(
             url=url))
         if self.cache:
             # 如果有存储方式

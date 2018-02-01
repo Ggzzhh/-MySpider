@@ -2,6 +2,7 @@
 from urllib.request import urlparse, urlopen
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+from selenium import webdriver
 from 爬去成都租房信息_csv版.c_ip import get_ips, del_ip
 import requests
 import time
@@ -399,6 +400,81 @@ class GanJiCallback:
                 # print(row)
                 self.writer.writerow(row)
 
+
+class GetLianJiaUrl:
+    """收集链家所有租房信息url"""
+    def __init__(self):
+        self.writer = csv.writer(open('tenement.csv', 'a',
+                                      encoding='utf-8'))
+
+    def __call__(self, url):
+        driver = webdriver.PhantomJS(
+            executable_path=r"D:\Web\phantomjs-2.1.1-windows\bin\phantomjs.exe")
+        driver.get(url)
+        time.sleep(5)
+        links = driver.find_element_by_id('house-lst').find_elements_by_xpath(
+            '//h2/a')
+        lists = []
+        for link in links:
+            lists.append(link.get_property('href'))
+        return lists
+
+
+class LianJiaCallback:
+    """提取链家网页中的信息"""
+    def __init__(self):
+        self.writer = csv.writer(open('tenement.csv', 'a', encoding='utf-8'))
+
+    def __call__(self, url, html):
+        if re.search('lianjia', url):
+            row = []
+            soup = BeautifulSoup(html, 'lxml')
+            content = soup.find('div', class_='content-wrapper')
+            title = content.find('div', class_='title-wrapper').div.find(
+                'div', class_='title')
+            overview = content.find('div', class_='overview')\
+                .find('div', class_='content')
+            room = overview.find('div', class_='zf-room').find_all('p')
+            price = overview.find('div', class_='price')
+            if len(room) != 8:
+                raise 'index 出现错误'
+            # 房源名'
+            row.append(title.h1.get_text(strip=True))
+            # '网址'
+            row.append(url)
+            # '小区名'
+            row.append(room[5].a.get_text(strip=True))
+            # 户型
+            x = ''
+            for y in room[1].stripped_strings:
+                x = y
+            x = x.split(' ')
+            row.append(x[0])
+            # 面积
+            row.append(room[0].get_text(strip=True).split('：')[-1])
+            # '价格'
+            row.append(price.find('span', class_='total').get_text(strip=True))
+            # '朝向'
+            row.append(room[3].get_text(strip=True).split('：')[-1])
+            # '楼层'
+            row.append(room[2].get_text(strip=True).split('：')[-1])
+            # '装修'
+            zx = price.find('span', class_='tips')
+            row.append(zx.get_text(strip=True) if zx else '空')
+            # '建造时间'
+            row.append(' ')
+            # '出租类型'
+            row.append(x[-1])
+            # '所在区'
+            address = room[6].find_all('a')
+            row.append(address[0].get_text(strip=True))
+            # '地址'
+            row.append(address[-1].get_text(strip=True))
+            # '标签'
+            row.append(title.find('div', class_='sub').get_text(strip=True))
+            # print(row)
+            self.writer.writerow(row)
+
 FIELD = ('房源名', '网址', '小区名', '户型', '面积', '价格', '朝向', '楼层', '装修',
          '建造时间', '出租类型', '所在区', '地址', '标签')
 if __name__ == '__main__':
@@ -413,9 +489,13 @@ if __name__ == '__main__':
     # '所在区'
     # '地址'
     # '标签'
-    cache = DiskCache()
-    url = 'http://cd.ganji.com/fang1/m15/'
-    html = urlopen(url)
+    # cache = DiskCache()
+    url = 'https://cd.lianjia.com/zufang/106100943871.html'
+    session = requests.Session()
+    html = session.get(url).text
+    lian = LianJiaCallback()
+    lian(url, html)
+
     # print(html)
-    test = GanJiCallback()
-    test(url, html)
+    # test = GanJiCallback()
+    # test(url, html)
