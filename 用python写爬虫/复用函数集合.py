@@ -272,6 +272,11 @@ def get_links(html):
 
 
 def get_robots(seed_url):
+    """
+    获取机器人守则
+    :param seed_url:
+    :return: 返回一个 urllib.robotparser.RobotFileParser 对象 或者 None
+    """
     rp = RobotFileParser()
     rp.set_url(urljoin(seed_url, '/robots.txt'))
     try:
