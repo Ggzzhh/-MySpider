@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-# import .settings
+
+import OSpider.settings
 
 import logging
-# logging.basicConfig(level=settings.LEVEL,
-#                     format='%(asctime)s - %(name)s - %(levelname)s - %('
-#                            'message)s')
+logging.basicConfig(level=settings.LEVEL,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %('
+                           'message)s')
 
 logger = logging.getLogger('OSpider')
 

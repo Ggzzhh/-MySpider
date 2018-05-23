@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
-print(sys.path)
 import time
 import threading
 from datetime import datetime
@@ -8,9 +6,17 @@ from pprint import pprint
 
 import redis
 
+try:
+    import OSpider
+except:
+    import sys
+    import os
+    sys.path.append(os.path.abspath('..'))
+
 from OSpider import logger
 from OSpider.download import DOWNLOAD
 from OSpider.settings import *
+
 """
     SCHEDULER（调度器）
 """
@@ -84,7 +90,6 @@ class SCHEDULER:
                 print(123)
         except KeyboardInterrupt:
             print('程序停止')
-            raise 1
 
 
 def parse(response):
