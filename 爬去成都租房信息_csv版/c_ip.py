@@ -93,3 +93,7 @@ def del_ip(ip):
             f.write(i)
 
 
+if __name__ == '__main__':
+    get_ips()
+
+
