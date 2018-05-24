@@ -37,7 +37,7 @@ class Throttle:
 
 class DOWNLOAD:
 
-    def __init__(self, proxy=None, delay=DELAY,
+    def __init__(self, proxy=None, delay=DELAY, num_retries=NUM_RETRIES,
                  timeout=TIMEOUT, headers=HEADERS, **kwargs):
         """
         初始化
@@ -45,6 +45,7 @@ class DOWNLOAD:
         :param delay:  下载延迟
         :param timeout: 下载超时时间
         :param headers: 下载时使用的文件头
+        :param num_retries: 下载重试次数
         :param kwargs:  其他
         """
         self.proxy = proxy
@@ -52,6 +53,7 @@ class DOWNLOAD:
         self.headers = headers or {'User-agent': 'OSpider'}
         self.logging = logger
         self.throttle = Throttle(delay)
+        self.num_retries = num_retries
         self.kwargs = kwargs
 
     def __call__(self, url, method='GET', data=None, cookies=None, **kwargs):
@@ -70,10 +72,12 @@ class DOWNLOAD:
         methods = ["GET", "POST", "PUT", "DELETE"]
         session = requests.Session()
         session.headers = self.headers
+        count = 0
         if self.proxy:
             if isinstance(self.proxy, dict):
                 if self.proxy.get('http') or self.proxy.get('https'):
                     session.proxies = self.proxy
+                    self.logging.info('设置代理:{}'.format(self.proxy))
             else:
                 self.logging.error('代理格式错误，需要使用字典格式')
         if method not in methods:
@@ -85,6 +89,15 @@ class DOWNLOAD:
             html = res.text
             status = res.status_code
         except Exception as e:
+            print(e)
+            html = ''
+            if hasattr(e, 'code'):
+                code = e.code
+                if self.num_retries > 0 and 500 <= code < 600:
+                    self.num_retries -= 1
+                    return self.download(url, method, data, cookies)
+            else:
+                code = None
             self.logging.error(e)
             html = None
             status = None
@@ -92,5 +105,5 @@ class DOWNLOAD:
 
 if __name__ == '__main__':
     D = DOWNLOAD()
-    res = D('http://ip.chinaz.com/')
-    print(res)
+    res = D('http://113.245.21.25')
+    print(res['status'] == 200)
