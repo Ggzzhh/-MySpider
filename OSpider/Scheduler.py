@@ -18,7 +18,7 @@ from OSpider.download import DOWNLOAD
 from OSpider.settings import *
 
 """
-    SCHEDULER（调度器）
+    SCHEDULER（调度器） 目前只有抓取然后返回结果的功能.....
 """
 
 __author__ = 'Ggzzhh'
@@ -52,7 +52,7 @@ class SCHEDULER:
         self.start_time = datetime.now()
 
     def get_url(self):
-        """获取url"""
+        """根据设置提取url"""
         try:
             if IS_SET_OR_LIST == "SET":
                 url = self.r.spop(REDIS_KEY)
@@ -80,6 +80,7 @@ class SCHEDULER:
                 pprint('没有解析函数，直接打印结果：')
                 pprint(res)
 
+    # 使用threading达成了并发抓取，因为是密集型IO所以影响不大。
     def run(self):
         """开始进行抓取"""
         threads = []
@@ -99,14 +100,17 @@ class SCHEDULER:
                     if not thread.is_alive():
                         # 移除停止活动的线程
                         threads.remove(thread)
+                # 如果活动的线程数没有到达最大线程就继续创建线程
                 while len(threads) < self.max_threads:
                     thread = threading.Thread(target=self.crawl)
                     thread.setDaemon(True)
                     thread.start()
                     threads.append(thread)
                 time.sleep(3)
+        # 按了CTRL+c之后....
         except KeyboardInterrupt:
             self.leave_time = 0
+            # 等待线程结束然后移除还在活动的线程
             for thread in threads:
                 thread.join()
                 if thread.is_alive():

@@ -5,7 +5,7 @@
 # 日志级别
 LEVEL = 'DEBUG'
 # 默认下载间隔
-DELAY = 0.1
+DELAY = 0.5
 # 等待超时
 TIMEOUT = 30
 # 使用的头信息
@@ -19,7 +19,7 @@ HEADERS = {
     'authorization': 'oauth c3cef7c66a1843f8b3a9e6a1e3160e20'
 }
 # 最大线程
-MAX_THREADS = 40
+MAX_THREADS = 10
 # 重试次数
 NUM_RETRIES = 3
 # 代理池

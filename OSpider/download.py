@@ -57,9 +57,21 @@ class DOWNLOAD:
         self.kwargs = kwargs
 
     def __call__(self, url, method='GET', data=None, cookies=None, **kwargs):
+        """
+        这个魔法函数可以让类的实例像函数一样被调用，例如：
+        D = DOWNLOAD(...)
+        result = D(url)
+        :param url:  url
+        :param method:  请求的方法
+        :param data:    请求的内容
+        :param cookies: 请求时使用的cookies
+        :param kwargs:  其他，比如代理
+        :return: {'html': 网页内容, 'status': 状态码, 'url': 请求地址}
+        """
+        # 设置同个域下的限速
         self.throttle.wait(url)
-        res = self.download(url, method, data, cookies)
-        return res
+        # 让类的实例返回download函数的返回值
+        return self.download(url, method, data, cookies)
 
     def download(self, url, method='GET', data=None, cookies=None):
         """
@@ -71,8 +83,9 @@ class DOWNLOAD:
         """
         methods = ["GET", "POST", "PUT", "DELETE"]
         session = requests.Session()
+        # 设置头信息
         session.headers = self.headers
-        count = 0
+        # 设置代理
         if self.proxy:
             if isinstance(self.proxy, dict):
                 if self.proxy.get('http') or self.proxy.get('https'):
@@ -80,16 +93,19 @@ class DOWNLOAD:
                     self.logging.info('设置代理:{}'.format(self.proxy))
             else:
                 self.logging.error('代理格式错误，需要使用字典格式')
+        # 检查请求方法
         if method not in methods:
             raise ValueError("请求方法错误, 请在{}中选择!".format(methods))
+        # 设置cookies
         if cookies:
             session.cookies = cookies
+        # 获取内容并返回
         try:
             res = session.request(method, url, data=data)
             html = res.text
             status = res.status_code
+        # 出现问题打印到日志，然后重试num_retries次
         except Exception as e:
-            print(e)
             html = ''
             if hasattr(e, 'code'):
                 code = e.code
@@ -102,8 +118,3 @@ class DOWNLOAD:
             html = None
             status = None
         return {'html': html, 'status': status, 'url': url}
-
-if __name__ == '__main__':
-    D = DOWNLOAD()
-    res = D('http://113.245.21.25')
-    print(res['status'] == 200)
