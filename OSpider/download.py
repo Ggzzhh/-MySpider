@@ -38,7 +38,7 @@ class Throttle:
 class DOWNLOAD:
 
     def __init__(self, proxy=None, delay=DELAY, num_retries=NUM_RETRIES,
-                 timeout=TIMEOUT, headers=HEADERS, **kwargs):
+                 timeout=TIMEOUT, headers=HEADERS, encoding=ENCODING,**kwargs):
         """
         初始化
         :param proxy: 下载时使用的代理
@@ -54,6 +54,7 @@ class DOWNLOAD:
         self.logging = logger
         self.throttle = Throttle(delay)
         self.num_retries = num_retries
+        self.encoding = encoding
         self.kwargs = kwargs
 
     def __call__(self, url, method='GET', data=None, cookies=None, **kwargs):
@@ -102,6 +103,7 @@ class DOWNLOAD:
         # 获取内容并返回
         try:
             res = session.request(method, url, data=data)
+            res.encoding = self.encoding or 'utf-8'
             html = res.text
             status = res.status_code
         # 出现问题打印到日志，然后重试num_retries次
