@@ -15,7 +15,7 @@ from OSpider import OSPIDER, logger
 # 继承爬虫类，其实这个类也没啥东西, 就是调用了一下调度器类，所以不展示了。
 class T(OSPIDER):
     # 创建一个存储用的redis链接
-    r = redis.StrictRedis()
+    r = redis.StrictRedis(host='192.168.2.108')
     # 爬虫类中也有一个解析函数，这个函数有一个要求，有个参数必须名为response
 
     def parse(self, response):

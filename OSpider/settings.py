@@ -27,7 +27,7 @@ WAIT_TIME = 3
 # 队列为空时总等待时常，超时中断程序
 LEAVE_TIME = 30
 # redis相关设置
-REDIS_HOST = '127.0.0.1'
+REDIS_HOST = '192.168.2.108'
 # redis服务器端口
 REDIS_PORT = '6379'
 # url所在的key

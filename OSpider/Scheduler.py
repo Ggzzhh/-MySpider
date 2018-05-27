@@ -94,6 +94,9 @@ class SCHEDULER:
                     wait += self.wait_time
                     if wait >= self.leave_time:
                         print('{}秒内获取不到url，程序终端'.format(self.leave_time))
+                        print('花费时间{}'.format(datetime.now() - self.start_time))
+                        print('下载了{}个url的内容'.format(
+                            self.start_num - self.show_num()))
                         break
                     continue
                 for thread in threads:
@@ -106,7 +109,6 @@ class SCHEDULER:
                     thread.setDaemon(True)
                     thread.start()
                     threads.append(thread)
-                time.sleep(3)
         # 按了CTRL+c之后....
         except KeyboardInterrupt:
             self.leave_time = 0
